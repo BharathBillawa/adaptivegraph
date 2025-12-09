@@ -52,7 +52,7 @@ class FaissExperienceStore:
     Requirements: `faiss-cpu` package.
     Metric: cosine similarity implemented via normalized vectors and inner product (IP).
     """
-    def __init__(self, dim: int, metric: str = "cosine"):
+    def __init__(self, dim: int, metric: str = "cosine", persist_path: Optional[str] = None):
         try:
             import faiss  # type: ignore
         except Exception as e:
@@ -64,6 +64,7 @@ class FaissExperienceStore:
         self.dim = dim
         self.metric = metric
         self._faiss = faiss
+        self.persist_path = persist_path
 
         # Use inner-product index; for cosine, inputs should be normalized
         self.index = faiss.IndexFlatIP(dim)
@@ -71,6 +72,38 @@ class FaissExperienceStore:
         self.actions: List[int] = []
         self.rewards: List[float] = []
         self.metadata: List[Optional[Dict[str, Any]]] = []
+
+        if self.persist_path:
+            self._load()
+
+    def _load(self):
+        import os
+        import pickle
+        if os.path.exists(self.persist_path + ".index") and os.path.exists(self.persist_path + ".pkl"):
+            try:
+                self.index = self._faiss.read_index(self.persist_path + ".index")
+                with open(self.persist_path + ".pkl", "rb") as f:
+                    data = pickle.load(f)
+                    self.contexts = data["contexts"]
+                    self.actions = data["actions"]
+                    self.rewards = data["rewards"]
+                    self.metadata = data["metadata"]
+            except Exception as e:
+                print(f"Warning: Failed to load persistence file {self.persist_path}: {e}")
+
+    def save(self):
+        if not self.persist_path:
+            return
+        import pickle
+        self._faiss.write_index(self.index, self.persist_path + ".index")
+        data = {
+            "contexts": self.contexts,
+            "actions": self.actions,
+            "rewards": self.rewards,
+            "metadata": self.metadata
+        }
+        with open(self.persist_path + ".pkl", "wb") as f:
+            pickle.dump(data, f)
 
     def add(self, context: np.ndarray, action: int, reward: float, metadata: Optional[Dict[str, Any]] = None) -> None:
         # Normalize for cosine if needed
@@ -84,6 +117,9 @@ class FaissExperienceStore:
         self.actions.append(action)
         self.rewards.append(reward)
         self.metadata.append(metadata)
+        
+        if self.persist_path:
+            self.save()
 
     def get_all(self) -> Dict[str, Any]:
         if not self.contexts:
@@ -117,3 +153,10 @@ class FaissExperienceStore:
         self.actions = []
         self.rewards = []
         self.metadata = []
+        
+        if self.persist_path:
+            import os
+            if os.path.exists(self.persist_path + ".index"):
+                os.remove(self.persist_path + ".index")
+            if os.path.exists(self.persist_path + ".pkl"):
+                os.remove(self.persist_path + ".pkl")

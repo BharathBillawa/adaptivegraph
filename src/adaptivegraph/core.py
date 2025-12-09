@@ -7,11 +7,13 @@ from .memory import InMemoryExperienceStore, ExperienceStore
 
 class LearnableEdge:
     @classmethod
+    @classmethod
     def create(
         cls,
         options: List[str],
         embedding: str = "sentence-transformers",
         memory: str = "faiss",
+        memory_persist_path: Optional[str] = None,
         feature_dim: int = 32,
         **kwargs
     ) -> "LearnableEdge":
@@ -22,6 +24,7 @@ class LearnableEdge:
             options: List of available actions.
             embedding: Encoding strategy ("sentence-transformers", etc).
             memory: Experience storage strategy ("faiss", "memory").
+            memory_persist_path: Path prefix for saving memory (if memory="faiss").
             feature_dim: Dimension of state vector.
             **kwargs: Additional args passed to LearnableEdge constructor.
         """
@@ -37,7 +40,7 @@ class LearnableEdge:
         experience_store = None
         if memory == "faiss":
             from .memory import FaissExperienceStore
-            experience_store = FaissExperienceStore(dim=feature_dim)
+            experience_store = FaissExperienceStore(dim=feature_dim, persist_path=memory_persist_path)
         elif memory == "memory":
              experience_store = InMemoryExperienceStore()
         else:
