@@ -1,0 +1,24 @@
+# Include documentation
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+
+# Include examples and notebooks
+recursive-include examples *.py
+recursive-include notebooks *.ipynb
+
+# Include documentation
+recursive-include docs *.md
+
+# Include tests
+recursive-include tests *.py
+
+# Exclude development files
+exclude .pre-commit-config.yaml
+exclude .python-version
+exclude debug_simulation.py
+exclude pyproject.toml.bak
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
