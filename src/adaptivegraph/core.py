@@ -1,9 +1,11 @@
-from typing import Any, Callable, List, Optional, Dict
-import numpy as np
 import logging
+from typing import Any, Callable, Dict, List, Optional
+
+import numpy as np
+
 from .encoder import StateEncoder
+from .memory import ExperienceStore, InMemoryExperienceStore
 from .policy import LinUCBPolicy
-from .memory import InMemoryExperienceStore, ExperienceStore
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +19,11 @@ class LearnableEdge:
         memory: str = "faiss",
         memory_persist_path: Optional[str] = None,
         feature_dim: int = 32,
-        **kwargs
+        **kwargs,
     ) -> "LearnableEdge":
         """
         Factory method to create a LearnableEdge with pre-configured components.
-        
+
         Args:
             options: List of available actions.
             embedding: Encoding strategy ("sentence-transformers", etc).
@@ -34,6 +36,7 @@ class LearnableEdge:
         embedding_fn = None
         if embedding == "sentence-transformers":
             from .embedding import SentenceTransformerEmbedding
+
             embedding_fn = SentenceTransformerEmbedding(dim=feature_dim)
         else:
             raise ValueError(f"Unknown embedding option: {embedding}")
@@ -42,7 +45,10 @@ class LearnableEdge:
         experience_store = None
         if memory == "faiss":
             from .memory import FaissExperienceStore
-            experience_store = FaissExperienceStore(dim=feature_dim, persist_path=memory_persist_path)
+
+            experience_store = FaissExperienceStore(
+                dim=feature_dim, persist_path=memory_persist_path
+            )
         elif memory == "memory":
             experience_store = InMemoryExperienceStore()
         else:
@@ -53,7 +59,7 @@ class LearnableEdge:
             feature_dim=feature_dim,
             embedding_fn=embedding_fn,
             experience_store=experience_store,
-            **kwargs
+            **kwargs,
         )
 
     def __init__(
@@ -76,31 +82,43 @@ class LearnableEdge:
         if feature_dim <= 0:
             raise ValueError(f"feature_dim must be positive, got {feature_dim}")
         if exploration_alpha < 0:
-            raise ValueError(f"exploration_alpha must be non-negative, got {exploration_alpha}")
-        
+            raise ValueError(
+                f"exploration_alpha must be non-negative, got {exploration_alpha}"
+            )
+
         self.options = options
         self.reward_fn = reward_fn
         self.value_key = value_key
-        
+
         # Components
-        self.encoder = StateEncoder(output_dim=feature_dim, embedding_fn=embedding_fn, normalize=encoder_normalize)
+        self.encoder = StateEncoder(
+            output_dim=feature_dim,
+            embedding_fn=embedding_fn,
+            normalize=encoder_normalize,
+        )
 
         # Memory
-        self.memory = experience_store if experience_store is not None else InMemoryExperienceStore()
-        
+        self.memory = (
+            experience_store
+            if experience_store is not None
+            else InMemoryExperienceStore()
+        )
+
         if policy == "linucb":
-            self.policy = LinUCBPolicy(n_actions=len(options), feature_dim=feature_dim, alpha=exploration_alpha)
+            self.policy = LinUCBPolicy(
+                n_actions=len(options), feature_dim=feature_dim, alpha=exploration_alpha
+            )
         else:
             raise ValueError(f"Unknown policy: {policy}. Valid options: ['linucb']")
-            
+
         # State tracking for feedback
         # Supports both sequential (last_context) and async (ID-based) feedback.
         self._last_context: Optional[np.ndarray] = None
         self._last_action: int = -1
-        
+
         # Map event_id -> (context, action_idx)
         self.pending_decisions: Dict[str, Any] = {}
-        
+
         # Map trace_id -> List[(context, action_idx)]
         self.active_traces: Dict[str, List[Any]] = {}
 
@@ -115,26 +133,26 @@ class LearnableEdge:
                 value_to_encode = state.get(self.value_key, state)
             elif hasattr(state, self.value_key):
                 value_to_encode = getattr(state, self.value_key)
-                
+
         # 2. Encode
         context = self.encoder.encode(value_to_encode)
-        
+
         # 2. Select Action
         action_idx = self.policy.select_action(context)
         action_name = self.options[action_idx]
         logger.debug(f"Selected action '{action_name}' (index {action_idx}) for state")
-        
+
         # 3. Store temporary state for feedback
         self._last_context = context
         self._last_action = action_idx
-        
+
         # 3b. ID-Based Tracking (if ID present in state)
         if isinstance(state, dict):
             # Check for generic event_id
             event_id = state.get("event_id") or state.get("id") or state.get("run_id")
             if event_id:
                 self.pending_decisions[str(event_id)] = (context, action_idx)
-            
+
             # Check for trace_id (Trajectory tracking)
             trace_id = state.get("trace_id")
             if trace_id:
@@ -142,15 +160,20 @@ class LearnableEdge:
                 if t_id not in self.active_traces:
                     self.active_traces[t_id] = []
                 self.active_traces[t_id].append((context, action_idx))
-        
+
         # 4. Return routing decision
         return action_name
 
-    def record_feedback(self, result: Any, reward: Optional[float] = None, event_id: Optional[str] = None) -> None:
+    def record_feedback(
+        self,
+        result: Any,
+        reward: Optional[float] = None,
+        event_id: Optional[str] = None,
+    ) -> None:
         """
         Updates the model based on the result.
         Can be called manually or via a callback hook.
-        
+
         Args:
             result: The result state (used if reward_fn is set).
             reward: Explicit reward float.
@@ -176,30 +199,32 @@ class LearnableEdge:
 
         if target_context is None or target_action == -1:
             return  # No pending action to reward
-            
+
         # Compute reward
         if reward is None:
             if self.reward_fn:
                 reward = self.reward_fn(result)
             else:
                 reward = 0.0  # Default/Warning?
-        
+
         # Validate reward
         if not np.isfinite(reward):
             raise ValueError(f"Reward must be finite, got {reward}")
-        
+
         # Update Policy
         self.policy.update(target_context, target_action, reward)
         logger.info(f"Recorded feedback: action={target_action}, reward={reward:.3f}")
-        
+
         # Store Experience
         self.memory.add(target_context, target_action, reward)
 
-    def complete_trace(self, trace_id: str, final_reward: float, decay: float = 1.0) -> None:
+    def complete_trace(
+        self, trace_id: str, final_reward: float, decay: float = 1.0
+    ) -> None:
         """
         Apply a final reward to an entire trajectory of decisions.
         Use this for multi-step agents where intermediate rewards are unknown.
-        
+
         Args:
             trace_id: The identifier for the session/trace.
             final_reward: The success/fail score of the entire trace.
@@ -208,17 +233,17 @@ class LearnableEdge:
         t_id = str(trace_id)
         if t_id not in self.active_traces:
             return
-        
+
         # Validate reward
         if not np.isfinite(final_reward):
             raise ValueError(f"final_reward must be finite, got {final_reward}")
-            
+
         decisions = self.active_traces.pop(t_id)
         current_reward = final_reward
-        
+
         # Iterate in reverse order if applying decay (last step gets full reward, earlier steps get discounted)
         # Or standard credit assignment
-        for (ctx, act) in reversed(decisions):
+        for ctx, act in reversed(decisions):
             self.policy.update(ctx, act, current_reward)
             self.memory.add(ctx, act, current_reward)
             current_reward *= decay
@@ -226,11 +251,12 @@ class LearnableEdge:
     def save_policy(self, path: str) -> None:
         """
         Save the policy state (A, b matrices) to disk.
-        
+
         Args:
             path: File path to save policy state (without extension).
         """
         import pickle
+
         policy_state = {
             "A": self.policy.A,
             "b": self.policy.b,
@@ -244,22 +270,22 @@ class LearnableEdge:
     def load_policy(self, path: str) -> None:
         """
         Load policy state from disk.
-        
+
         Args:
             path: File path to load policy state from (without extension).
-        
+
         Raises:
             ValueError: If loaded policy state doesn't match current configuration.
         """
-        import pickle
         import os
-        
+        import pickle
+
         if not os.path.exists(f"{path}.pkl"):
             raise FileNotFoundError(f"Policy file not found: {path}.pkl")
-        
+
         with open(f"{path}.pkl", "rb") as f:
             policy_state = pickle.load(f)
-        
+
         # Validate compatibility
         if policy_state["n_actions"] != self.policy.n_actions:
             raise ValueError(
@@ -271,7 +297,7 @@ class LearnableEdge:
                 f"Policy feature_dim mismatch: expected {self.policy.feature_dim}, "
                 f"got {policy_state['feature_dim']}"
             )
-        
+
         # Load state
         self.policy.A = policy_state["A"]
         self.policy.b = policy_state["b"]

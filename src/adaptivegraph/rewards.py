@@ -1,10 +1,12 @@
-from typing import Any, Protocol, List, Optional, Union, Dict
+from typing import Any, Dict, List, Optional, Protocol, Union
+
 
 class RewardScorer(Protocol):
     """
     Protocol for calculating a reward based on the input state (before action)
     and the result state (after action).
     """
+
     def score(self, params: Dict[str, Any]) -> float:
         """
         Calculate reward.
@@ -12,12 +14,19 @@ class RewardScorer(Protocol):
         """
         ...
 
+
 class ErrorScorer:
     """
     Assigns a penalty if specific error keys exist in the result state,
     or if an exception object is passed.
     """
-    def __init__(self, error_keys: List[str] = ["error", "exception"], penalty: float = -1.0, success_reward: float = 1.0):
+
+    def __init__(
+        self,
+        error_keys: List[str] = ["error", "exception"],
+        penalty: float = -1.0,
+        success_reward: float = 1.0,
+    ):
         self.error_keys = error_keys
         self.penalty = penalty
         self.success_reward = success_reward
@@ -33,14 +42,16 @@ class ErrorScorer:
         # If result is an Exception object itself (unlikely in pure state dicts but possible in frameworks)
         if isinstance(result, Exception):
             return self.penalty
-            
+
         return self.success_reward
+
 
 class LLMScorer:
     """
     Uses an LLM to judge the quality of the interaction.
     Requires an llm callable (e.g., langchain Runnable or function).
     """
+
     def __init__(self, llm_callable: Any, prompt_template: str):
         """
         Args:
@@ -67,9 +78,10 @@ class LLMScorer:
                     text = str(result)
             else:
                 text = str(self.llm(formatted_prompt))
-            
+
             # Naive parsing: find the first number
             import re
+
             match = re.search(r"[-+]?\d*\.\d+|\d+", text)
             if match:
                 return float(match.group())

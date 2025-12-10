@@ -1,13 +1,18 @@
-from typing import Protocol, List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Protocol
+
 import numpy as np
 
 
 class ExperienceStore(Protocol):
-    def add(self, context: np.ndarray, action: int, reward: float, metadata: Optional[Dict[str, Any]] = None) -> None:
-        ...
-    
-    def get_all(self) -> Dict[str, Any]:
-        ...
+    def add(
+        self,
+        context: np.ndarray,
+        action: int,
+        reward: float,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None: ...
+
+    def get_all(self) -> Dict[str, Any]: ...
 
 
 class InMemoryExperienceStore:
@@ -17,7 +22,13 @@ class InMemoryExperienceStore:
         self.rewards: List[float] = []
         self.metadata: List[Optional[Dict[str, Any]]] = []
 
-    def add(self, context: np.ndarray, action: int, reward: float, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def add(
+        self,
+        context: np.ndarray,
+        action: int,
+        reward: float,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self.contexts.append(context)
         self.actions.append(action)
         self.rewards.append(reward)
@@ -30,13 +41,13 @@ class InMemoryExperienceStore:
                 "contexts": np.array([]),
                 "actions": np.array([]),
                 "rewards": np.array([]),
-                "metadata": []
+                "metadata": [],
             }
         return {
             "contexts": np.stack(self.contexts),
             "actions": np.array(self.actions),
             "rewards": np.array(self.rewards),
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
     def clear(self):
@@ -53,7 +64,7 @@ class FaissExperienceStore:
 
     Requirements: `faiss-cpu` package.
     Metric: cosine similarity implemented via normalized vectors and inner product (IP).
-    
+
     Args:
         dim: Dimension of vectors.
         metric: Distance metric ('cosine' recommended).
@@ -61,7 +72,14 @@ class FaissExperienceStore:
         auto_save: If True, save after every add(). If False, call save() manually.
                    Set to False for better performance with frequent updates.
     """
-    def __init__(self, dim: int, metric: str = "cosine", persist_path: Optional[str] = None, auto_save: bool = True):
+
+    def __init__(
+        self,
+        dim: int,
+        metric: str = "cosine",
+        persist_path: Optional[str] = None,
+        auto_save: bool = True,
+    ):
         try:
             import faiss  # type: ignore
         except Exception as e:
@@ -89,7 +107,10 @@ class FaissExperienceStore:
     def _load(self):
         import os
         import pickle
-        if os.path.exists(self.persist_path + ".index") and os.path.exists(self.persist_path + ".pkl"):
+
+        if os.path.exists(self.persist_path + ".index") and os.path.exists(
+            self.persist_path + ".pkl"
+        ):
             try:
                 self.index = self._faiss.read_index(self.persist_path + ".index")
                 with open(self.persist_path + ".pkl", "rb") as f:
@@ -99,23 +120,32 @@ class FaissExperienceStore:
                     self.rewards = data["rewards"]
                     self.metadata = data["metadata"]
             except Exception as e:
-                print(f"Warning: Failed to load persistence file {self.persist_path}: {e}")
+                print(
+                    f"Warning: Failed to load persistence file {self.persist_path}: {e}"
+                )
 
     def save(self):
         if not self.persist_path:
             return
         import pickle
+
         self._faiss.write_index(self.index, self.persist_path + ".index")
         data = {
             "contexts": self.contexts,
             "actions": self.actions,
             "rewards": self.rewards,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
         with open(self.persist_path + ".pkl", "wb") as f:
             pickle.dump(data, f)
 
-    def add(self, context: np.ndarray, action: int, reward: float, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def add(
+        self,
+        context: np.ndarray,
+        action: int,
+        reward: float,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         # Normalize for cosine if needed
         vec = context.astype(np.float32)
         if self.metric == "cosine":
@@ -127,7 +157,7 @@ class FaissExperienceStore:
         self.actions.append(action)
         self.rewards.append(reward)
         self.metadata.append(metadata)
-        
+
         if self.persist_path and self.auto_save:
             self.save()
 
@@ -137,13 +167,13 @@ class FaissExperienceStore:
                 "contexts": np.array([]),
                 "actions": np.array([]),
                 "rewards": np.array([]),
-                "metadata": []
+                "metadata": [],
             }
         return {
             "contexts": np.stack(self.contexts),
             "actions": np.array(self.actions),
             "rewards": np.array(self.rewards),
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
     def query_similar(self, context: np.ndarray, k: int = 5) -> Dict[str, Any]:
@@ -163,9 +193,10 @@ class FaissExperienceStore:
         self.actions = []
         self.rewards = []
         self.metadata = []
-        
+
         if self.persist_path:
             import os
+
             if os.path.exists(self.persist_path + ".index"):
                 os.remove(self.persist_path + ".index")
             if os.path.exists(self.persist_path + ".pkl"):

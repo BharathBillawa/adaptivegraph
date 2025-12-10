@@ -45,7 +45,10 @@ dev = [
     "langgraph>=0.2.0",
     "pytest",
     "matplotlib",
-    "jupyter"
+    "jupyter",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=7.0.0",
 ]
 
 embed = [
