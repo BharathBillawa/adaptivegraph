@@ -53,9 +53,18 @@ edge.record_feedback(result={}, reward=1.0) # Good choice!
 3. **Action**: The best option is returned.
 4. **Learning**: When `record_feedback` is called, the model updates its internal weights to make better choices next time.
 
+## Real-World Example: Customer Support Agent
+
+See [`examples/customer_support_agent.py`](examples/customer_support_agent.py) for a complete, production-ready example that demonstrates:
+1. **Semantic Routing**: "Reset password" -> QuickBot, "Server Error" -> Human Expert.
+2. **Trajectory Rewards**: Rewarding a full session of multiple turns.
+3. **Async Human Feedback**: Simulate a user rating the ticket 2 hours later.
+4. **Tool Crash Penalties**: Auto-detecting tool failures (`ErrorScorer`) and penalizing the router.
+
 ## Roadmap
 
-- [ ] Persistent Storage (Redis/SQL)
-- [ ] FAISS-based Context Memory
+- [x] Persistent Storage (FAISS/Pickle)
+- [x] Semantic State Encoding (Sentence Transformers)
+- [x] Async / ID-Based Feedback
+- [x] Trajectory / Trace Rewards
 - [ ] Epsilon-Greedy Policy
-```
