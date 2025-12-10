@@ -1,4 +1,7 @@
+import logging
 from typing import Any, Dict, List, Optional, Protocol, Union
+
+logger = logging.getLogger(__name__)
 
 
 class RewardScorer(Protocol):
@@ -87,5 +90,5 @@ class LLMScorer:
                 return float(match.group())
             return 0.0
         except Exception as e:
-            print(f"LLMScorer Error: {e}")
+            logger.error(f"LLMScorer failed to parse response: {e}")
             return 0.0

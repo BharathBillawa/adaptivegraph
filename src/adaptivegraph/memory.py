@@ -120,8 +120,8 @@ class FaissExperienceStore:
                     self.rewards = data["rewards"]
                     self.metadata = data["metadata"]
             except Exception as e:
-                print(
-                    f"Warning: Failed to load persistence file {self.persist_path}: {e}"
+                logger.warning(
+                    f"Failed to load persistence file {self.persist_path}: {e}"
                 )
 
     def save(self):
