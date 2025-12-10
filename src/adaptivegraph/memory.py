@@ -1,12 +1,14 @@
 from typing import Protocol, List, Dict, Any, Optional
 import numpy as np
 
+
 class ExperienceStore(Protocol):
     def add(self, context: np.ndarray, action: int, reward: float, metadata: Optional[Dict[str, Any]] = None) -> None:
         ...
     
     def get_all(self) -> Dict[str, Any]:
         ...
+
 
 class InMemoryExperienceStore:
     def __init__(self):
@@ -51,8 +53,15 @@ class FaissExperienceStore:
 
     Requirements: `faiss-cpu` package.
     Metric: cosine similarity implemented via normalized vectors and inner product (IP).
+    
+    Args:
+        dim: Dimension of vectors.
+        metric: Distance metric ('cosine' recommended).
+        persist_path: Path to save index and metadata (without extension).
+        auto_save: If True, save after every add(). If False, call save() manually.
+                   Set to False for better performance with frequent updates.
     """
-    def __init__(self, dim: int, metric: str = "cosine", persist_path: Optional[str] = None):
+    def __init__(self, dim: int, metric: str = "cosine", persist_path: Optional[str] = None, auto_save: bool = True):
         try:
             import faiss  # type: ignore
         except Exception as e:
@@ -65,6 +74,7 @@ class FaissExperienceStore:
         self.metric = metric
         self._faiss = faiss
         self.persist_path = persist_path
+        self.auto_save = auto_save
 
         # Use inner-product index; for cosine, inputs should be normalized
         self.index = faiss.IndexFlatIP(dim)
@@ -118,7 +128,7 @@ class FaissExperienceStore:
         self.rewards.append(reward)
         self.metadata.append(metadata)
         
-        if self.persist_path:
+        if self.persist_path and self.auto_save:
             self.save()
 
     def get_all(self) -> Dict[str, Any]:

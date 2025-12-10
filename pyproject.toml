@@ -1,12 +1,44 @@
 [project]
 name = "adaptivegraph"
 version = "0.1.0"
-description = "Add your description here"
+description = "Learnable conditional edges for agentic workflows using contextual bandits"
 readme = "README.md"
 requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "BharathBillawa", email = "bharathbillawa@gmail.com"}
+]
+keywords = [
+    "bandit",
+    "reinforcement-learning",
+    "contextual-bandit",
+    "agentic",
+    "langgraph",
+    "routing",
+    "machine-learning",
+    "linucb"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "numpy>=1.24.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/BharathBillawa/adaptivegraph"
+Documentation = "https://github.com/BharathBillawa/adaptivegraph#readme"
+Repository = "https://github.com/BharathBillawa/adaptivegraph"
+Issues = "https://github.com/BharathBillawa/adaptivegraph/issues"
 
 [project.optional-dependencies]
 dev = [

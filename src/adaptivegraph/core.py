@@ -1,12 +1,14 @@
 from typing import Any, Callable, List, Optional, Dict
 import numpy as np
+import logging
 from .encoder import StateEncoder
-from .embedding import SentenceTransformerEmbedding
 from .policy import LinUCBPolicy
 from .memory import InMemoryExperienceStore, ExperienceStore
 
+logger = logging.getLogger(__name__)
+
+
 class LearnableEdge:
-    @classmethod
     @classmethod
     def create(
         cls,
@@ -42,9 +44,9 @@ class LearnableEdge:
             from .memory import FaissExperienceStore
             experience_store = FaissExperienceStore(dim=feature_dim, persist_path=memory_persist_path)
         elif memory == "memory":
-             experience_store = InMemoryExperienceStore()
+            experience_store = InMemoryExperienceStore()
         else:
-             raise ValueError(f"Unknown memory option: {memory}")
+            raise ValueError(f"Unknown memory option: {memory}")
 
         return cls(
             options=options,
@@ -66,6 +68,16 @@ class LearnableEdge:
         exploration_alpha: float = 1.0,
         value_key: Optional[str] = None,
     ):
+        # Input validation
+        if not options or len(options) == 0:
+            raise ValueError("options must be a non-empty list")
+        if len(options) != len(set(options)):
+            raise ValueError("options must contain unique values")
+        if feature_dim <= 0:
+            raise ValueError(f"feature_dim must be positive, got {feature_dim}")
+        if exploration_alpha < 0:
+            raise ValueError(f"exploration_alpha must be non-negative, got {exploration_alpha}")
+        
         self.options = options
         self.reward_fn = reward_fn
         self.value_key = value_key
@@ -79,7 +91,7 @@ class LearnableEdge:
         if policy == "linucb":
             self.policy = LinUCBPolicy(n_actions=len(options), feature_dim=feature_dim, alpha=exploration_alpha)
         else:
-            raise ValueError(f"Unknown policy: {policy}")
+            raise ValueError(f"Unknown policy: {policy}. Valid options: ['linucb']")
             
         # State tracking for feedback
         # Supports both sequential (last_context) and async (ID-based) feedback.
@@ -110,6 +122,7 @@ class LearnableEdge:
         # 2. Select Action
         action_idx = self.policy.select_action(context)
         action_name = self.options[action_idx]
+        logger.debug(f"Selected action '{action_name}' (index {action_idx}) for state")
         
         # 3. Store temporary state for feedback
         self._last_context = context
@@ -171,8 +184,13 @@ class LearnableEdge:
             else:
                 reward = 0.0  # Default/Warning?
         
+        # Validate reward
+        if not np.isfinite(reward):
+            raise ValueError(f"Reward must be finite, got {reward}")
+        
         # Update Policy
         self.policy.update(target_context, target_action, reward)
+        logger.info(f"Recorded feedback: action={target_action}, reward={reward:.3f}")
         
         # Store Experience
         self.memory.add(target_context, target_action, reward)
@@ -190,6 +208,10 @@ class LearnableEdge:
         t_id = str(trace_id)
         if t_id not in self.active_traces:
             return
+        
+        # Validate reward
+        if not np.isfinite(final_reward):
+            raise ValueError(f"final_reward must be finite, got {final_reward}")
             
         decisions = self.active_traces.pop(t_id)
         current_reward = final_reward
@@ -200,3 +222,57 @@ class LearnableEdge:
             self.policy.update(ctx, act, current_reward)
             self.memory.add(ctx, act, current_reward)
             current_reward *= decay
+
+    def save_policy(self, path: str) -> None:
+        """
+        Save the policy state (A, b matrices) to disk.
+        
+        Args:
+            path: File path to save policy state (without extension).
+        """
+        import pickle
+        policy_state = {
+            "A": self.policy.A,
+            "b": self.policy.b,
+            "n_actions": self.policy.n_actions,
+            "feature_dim": self.policy.feature_dim,
+            "alpha": self.policy.alpha,
+        }
+        with open(f"{path}.pkl", "wb") as f:
+            pickle.dump(policy_state, f)
+
+    def load_policy(self, path: str) -> None:
+        """
+        Load policy state from disk.
+        
+        Args:
+            path: File path to load policy state from (without extension).
+        
+        Raises:
+            ValueError: If loaded policy state doesn't match current configuration.
+        """
+        import pickle
+        import os
+        
+        if not os.path.exists(f"{path}.pkl"):
+            raise FileNotFoundError(f"Policy file not found: {path}.pkl")
+        
+        with open(f"{path}.pkl", "rb") as f:
+            policy_state = pickle.load(f)
+        
+        # Validate compatibility
+        if policy_state["n_actions"] != self.policy.n_actions:
+            raise ValueError(
+                f"Policy n_actions mismatch: expected {self.policy.n_actions}, "
+                f"got {policy_state['n_actions']}"
+            )
+        if policy_state["feature_dim"] != self.policy.feature_dim:
+            raise ValueError(
+                f"Policy feature_dim mismatch: expected {self.policy.feature_dim}, "
+                f"got {policy_state['feature_dim']}"
+            )
+        
+        # Load state
+        self.policy.A = policy_state["A"]
+        self.policy.b = policy_state["b"]
+        self.policy.alpha = policy_state["alpha"]

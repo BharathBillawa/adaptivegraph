@@ -1,11 +1,19 @@
 from typing import Any, Optional, Callable
 import numpy as np
 import hashlib
+import warnings
+
 
 class StateEncoder:
     """
     Encodes arbitrary state into a fixed-size vector.
-    v1: Supports explicit vector pass-through or a simple deterministic hashing for strings/dicts.
+    
+    Supports three encoding modes:
+    1. Numpy arrays: Pass-through with truncation/padding to output_dim
+    2. Strings with embedding_fn: Use provided embedding function (e.g., SentenceTransformers)
+    3. Fallback: Deterministic hashing (WARNING: not semantically meaningful)
+    
+    For production use with text, strongly recommend providing embedding_fn.
     """
     def __init__(
         self,
@@ -18,9 +26,29 @@ class StateEncoder:
         self.normalize = normalize
 
     def encode(self, state: Any) -> np.ndarray:
+        """Encode state into a fixed-size vector.
+        
+        Args:
+            state: Input state (numpy array, string, dict, or any object).
+            
+        Returns:
+            Fixed-size numpy array of shape (output_dim,).
+            
+        Note:
+            - For numpy arrays: flattened and truncated/padded to output_dim.
+            - For strings with embedding_fn: embedded using provided function.
+            - For other types: deterministic hashing (NOT semantic similarity).
+        """
         if isinstance(state, np.ndarray):
             # If it's already a vector, resize or return (simple pass-through for now)
-            return state.flatten()[:self.output_dim]  # Naive truncation/flat
+            arr = state.flatten()
+            if arr.shape[0] > self.output_dim:
+                warnings.warn(
+                    f"Truncating vector from {arr.shape[0]} to {self.output_dim} dimensions. "
+                    f"Information may be lost.",
+                    UserWarning
+                )
+            return arr[:self.output_dim]
 
         if self.embedding_fn and isinstance(state, str):
             # Use provided embedding function
@@ -41,23 +69,14 @@ class StateEncoder:
             return arr
 
         # Fallback: Deterministic hashing for string/dict representation
-        # This is a 'poor man's embedding' for MVP without heavy ML deps
-        # It projects text features into a random fixed space (SimHash-ish)
-
+        # WARNING: This creates a random-but-deterministic vector, NOT semantic similarity.
+        # Strings like "cat" and "cats" will have completely unrelated vectors.
+        # For semantic similarity, use embedding_fn with sentence-transformers or similar.
+        
         state_str = str(state)
-        # Seeded random projection based on hash
-        # Use sha256 of string to seed a generator?
-        # Or simpler: just hash to buckets.
-
-        # Let's do a simple hashed feature vector
-        vector = np.zeros(self.output_dim)
-        # Hash the string multiple times with different salts to simulate dimensions?
-        # Or just use the bytes.
-
-        # Simple consistent hashing approach:
-        # Hash string -> int -> seed.
-        # Generate 'output_dim' random numbers.
-
+        
+        # Create deterministic pseudo-random vector using hash as seed
+        # This ensures identical inputs always produce identical outputs
         seed = int(hashlib.sha256(state_str.encode("utf-8")).hexdigest(), 16) % (2**32)
         rng = np.random.RandomState(seed)
         vector = rng.standard_normal(self.output_dim)
