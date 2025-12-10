@@ -5,30 +5,25 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-**Learnable Conditional Edges for Agentic Workflows**
+```python
+from adaptivegraph import LearnableEdge
+```
 
-AdaptiveGraph introduces a `LearnableEdge` primitive for agentic graph frameworks (like LangGraph). It replaces hand-written branching logic with an experience-driven, self-improving conditional edge powered by contextual bandits (LinUCB).
+AdaptiveGraph provides **`LearnableEdge`** – a conditional edge that improves routing decisions over time through reinforcement learning.
 
-## Features
+## What is LearnableEdge?
 
-- **Self-Optimizing Routing**: Uses LinUCB to learn the best path based on context.
-- **Lightweight & Fast**: No heavy RL, just efficient linear algebra logic.
-- **Universal Encoder**: Handles text or arbitrary state using deterministic embedding/hashing.
-- **Transparent**: Full observability into why decisions were made.
+`LearnableEdge` replaces static routing logic with a learning-based approach. Instead of hard-coded if/else statements, it learns from feedback which routes work best for different inputs.
 
-## Why AdaptiveGraph?
+**Key Features:**
+- 🧠 **Learning**: Adapts routing decisions based on feedback (currently LinUCB, more policies coming)
+- ⚡ **Lightweight**: No training phase, no model files – learns online
+- 🎯 **Balanced**: Balances exploration (trying new routes) vs exploitation (using proven routes)
+- 🔧 **Flexible**: Works with strings, dicts, numpy arrays, or custom embeddings
 
-Traditional routing in agentic workflows is **static and brittle**:
-- Hard-coded if/else logic
-- Requires manual tuning
-- Doesn't adapt to changing patterns
-- No learning from mistakes
+## Why LearnableEdge?
 
-AdaptiveGraph makes routing **adaptive and data-driven**:
-- ✅ Learns from feedback automatically
-- ✅ Balances exploration vs exploitation
-- ✅ Adapts to user patterns over time
-- ✅ Transparent decision-making (no black box)
+Traditional routing logic is static and brittle. LearnableEdge adds plasticity – it learns which routes work best through experience, automatically adapting as patterns change.
 
 ## Installation
 
@@ -64,48 +59,55 @@ pip install -e ".[all]"
 ```python
 from adaptivegraph import LearnableEdge
 
-# 1. Define the edge
-edge = LearnableEdge(
-    options=["expert_model", "fast_model"],
-    policy="linucb"
-)
+# Create edge with routing options
+edge = LearnableEdge(options=["expert_model", "fast_model", "cheap_model"])
 
-# 2. Use it in your routing logic
-# In LangGraph: graph.add_conditional_edge("start", edge)
+# Make decisions
+route = edge({"user": "premium", "query": "complex question"})
 
-# Simulate usage:
-decision = edge("complex query about physics")
-print(f"Routed to: {decision}")
-
-# 3. Provide Feedback
-# You must tell the edge how it did.
-edge.record_feedback(result={}, reward=1.0) # Good choice!
+# Provide feedback so it learns
+edge.record_feedback(result={}, reward=1.0)
 ```
 
-## How It Works
+**See more examples:**
+- [`examples/basic_routing.py`](examples/basic_routing.py) - Simple routing with feedback
+- [`examples/customer_support_agent.py`](examples/customer_support_agent.py) - LangGraph integration
+- [`notebooks/interactive_demo.ipynb`](notebooks/interactive_demo.ipynb) - Interactive walkthrough
 
-1. **State Encoding**: The input (string or object) is converted to a fixed-size vector.
-2. **Bandit Choice**: LinUCB estimates the potential reward for each option.
-3. **Action**: The best option is returned.
-4. **Learning**: When `record_feedback` is called, the model updates its internal weights to make better choices next time.
+## How LearnableEdge Works
 
-## Real-World Example: Customer Support Agent
+Think of `LearnableEdge` as a smart traffic router that learns which highway to recommend:
 
-See [`examples/customer_support_agent.py`](examples/customer_support_agent.py) for a complete, production-ready example that demonstrates:
-1. **Semantic Routing**: "Reset password" -> QuickBot, "Server Error" -> Human Expert.
-2. **Trajectory Rewards**: Rewarding a full session of multiple turns.
-3. **Async Human Feedback**: Simulate a user rating the ticket 2 hours later.
-4. **Tool Crash Penalties**: Auto-detecting tool failures (`ErrorScorer`) and penalizing the router.
+1. **Input State** → You provide any state (string, dict, array)
+2. **Encoding** → Converts state into a fixed-size vector (32-dim by default)
+3. **UCB Scoring** → For each option, calculates:
+   - **Expected reward** (what worked before)
+   - **Uncertainty bonus** (exploration value)
+   - **UCB Score** = expected_reward + α × uncertainty
+4. **Selection** → Picks option with highest UCB score
+5. **Feedback** → You call `record_feedback(reward)` 
+6. **Learning** → Updates internal belief about which options work best
 
-## Comparison with Alternatives
+The algorithm balances:
+- **Exploitation** → Using routes with good historical performance
+- **Exploration** → Trying routes with high uncertainty
 
-| Approach | Learns from Data | Setup Complexity | Interpretability | Performance |
-|----------|-----------------|------------------|------------------|-------------|
-| **AdaptiveGraph** | ✅ Yes | Low | High (UCB scores) | Adaptive |
-| Hard-coded Rules | ❌ No | Low | High | Static |
-| Random Routing | ❌ No | Very Low | N/A | Poor |
-| ML Classifier | ✅ Yes | High | Low | Good (needs labels) |
-| Epsilon-Greedy | ✅ Yes | Low | Medium | Explores too much |
+## Features
+
+- **Semantic Routing**: Use sentence transformers for similarity-based decisions
+- **Async Feedback**: Provide feedback hours later using event IDs
+- **Trajectory Rewards**: Reward entire multi-step sessions with decay
+- **Policy Persistence**: Save and restore learned routing policies
+
+See [`examples/`](examples/) and [`notebooks/`](notebooks/) for detailed usage.
+
+## Comparison
+
+**LearnableEdge vs alternatives:**
+- **vs If/Else Rules**: Learns from feedback instead of requiring manual updates
+- **vs ML Classifiers**: No training data needed, learns online from real usage
+- **vs LLM Routers**: Faster, cheaper, and adapts based on actual outcomes
+- **vs Random/Epsilon-Greedy**: Uses context to make smarter decisions, not just random exploration
 
 ## Performance
 
@@ -159,7 +161,7 @@ If you use AdaptiveGraph in your research, please cite:
 ```bibtex
 @software{adaptivegraph2024,
   title = {AdaptiveGraph: Learnable Conditional Edges for Agentic Workflows},
-  author = {BharathBillawa},
+  author = {BharathPoojary},
   year = {2024},
   url = {https://github.com/BharathBillawa/adaptivegraph}
 }
