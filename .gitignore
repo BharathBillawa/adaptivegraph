@@ -139,3 +139,4 @@ test_persist_data/
 *.pkl
 checkpoints/
 data/
+.pypirc
