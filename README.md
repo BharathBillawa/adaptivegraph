@@ -27,7 +27,7 @@ Traditional routing logic is static and brittle. LearnableEdge adds plasticity â
 
 ## Installation
 
-**From PyPI** (coming soon):
+**From PyPI**:
 ```bash
 pip install adaptivegraph
 ```
@@ -42,16 +42,16 @@ pip install -e .
 **With optional dependencies**:
 ```bash
 # For semantic embeddings
-pip install -e ".[embed]"
+pip install adaptivegraph[embed]
 
 # For persistent storage
-pip install -e ".[faiss]"
+pip install adaptivegraph[faiss]
 
 # For development
-pip install -e ".[dev]"
+pip install adaptivegraph[dev]
 
 # Everything
-pip install -e ".[all]"
+pip install adaptivegraph[all]
 ```
 
 ## Quick Start
