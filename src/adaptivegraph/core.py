@@ -82,10 +82,15 @@ class LearnableEdge:
             raise ValueError(f"Unknown policy: {policy}")
             
         # State tracking for feedback
-        # NOTE: This is simplistic and assumes sequential execution or single-request scope.
-        # In a real async server, this needs a request_id/thread_local.
+        # Supports both sequential (last_context) and async (ID-based) feedback.
         self._last_context: Optional[np.ndarray] = None
         self._last_action: int = -1
+        
+        # Map event_id -> (context, action_idx)
+        self.pending_decisions: Dict[str, Any] = {}
+        
+        # Map trace_id -> List[(context, action_idx)]
+        self.active_traces: Dict[str, List[Any]] = {}
 
     def __call__(self, state: Any) -> str:
         """
@@ -110,15 +115,53 @@ class LearnableEdge:
         self._last_context = context
         self._last_action = action_idx
         
+        # 3b. ID-Based Tracking (if ID present in state)
+        if isinstance(state, dict):
+            # Check for generic event_id
+            event_id = state.get("event_id") or state.get("id") or state.get("run_id")
+            if event_id:
+                self.pending_decisions[str(event_id)] = (context, action_idx)
+            
+            # Check for trace_id (Trajectory tracking)
+            trace_id = state.get("trace_id")
+            if trace_id:
+                t_id = str(trace_id)
+                if t_id not in self.active_traces:
+                    self.active_traces[t_id] = []
+                self.active_traces[t_id].append((context, action_idx))
+        
         # 4. Return routing decision
         return action_name
 
-    def record_feedback(self, result: Any, reward: Optional[float] = None) -> None:
+    def record_feedback(self, result: Any, reward: Optional[float] = None, event_id: Optional[str] = None) -> None:
         """
         Updates the model based on the result.
         Can be called manually or via a callback hook.
+        
+        Args:
+            result: The result state (used if reward_fn is set).
+            reward: Explicit reward float.
+            event_id: The ID of the event to provide feedback for (async mode).
         """
-        if self._last_context is None or self._last_action == -1:
+        target_context = None
+        target_action = -1
+
+        if event_id:
+            # Async Mode
+            if event_id in self.pending_decisions:
+                target_context, target_action = self.pending_decisions.pop(event_id)
+            else:
+                # Warning: ID not found or already processed
+                return
+        else:
+            # Sequential Mode
+            target_context = self._last_context
+            target_action = self._last_action
+            # Clear pending immediately
+            self._last_context = None
+            self._last_action = -1
+
+        if target_context is None or target_action == -1:
             return  # No pending action to reward
             
         # Compute reward
@@ -129,11 +172,31 @@ class LearnableEdge:
                 reward = 0.0  # Default/Warning?
         
         # Update Policy
-        self.policy.update(self._last_context, self._last_action, reward)
+        self.policy.update(target_context, target_action, reward)
         
         # Store Experience
-        self.memory.add(self._last_context, self._last_action, reward)
+        self.memory.add(target_context, target_action, reward)
+
+    def complete_trace(self, trace_id: str, final_reward: float, decay: float = 1.0) -> None:
+        """
+        Apply a final reward to an entire trajectory of decisions.
+        Use this for multi-step agents where intermediate rewards are unknown.
         
-        # Clear pending
-        self._last_context = None
-        self._last_action = -1
+        Args:
+            trace_id: The identifier for the session/trace.
+            final_reward: The success/fail score of the entire trace.
+            decay: Discount factor (e.g., 0.9) to apply to earlier steps. 1.0 = equal credit.
+        """
+        t_id = str(trace_id)
+        if t_id not in self.active_traces:
+            return
+            
+        decisions = self.active_traces.pop(t_id)
+        current_reward = final_reward
+        
+        # Iterate in reverse order if applying decay (last step gets full reward, earlier steps get discounted)
+        # Or standard credit assignment
+        for (ctx, act) in reversed(decisions):
+            self.policy.update(ctx, act, current_reward)
+            self.memory.add(ctx, act, current_reward)
+            current_reward *= decay
