@@ -137,6 +137,8 @@ The algorithm balances:
 
     ## Notes & Gotchas
     *   **Numpy Arrays**: Must match `feature_dim` (default 32). E.g., `np.random.randn(32)`.
+    *   **Factory Method**: `LearnableEdge.create()` defaults to `embedding="sentence-transformers"`, which requires the optional dependency.
+        *   To use **without** optional dependencies, set `embedding=None` (uses hashing).
     *   **Optional Dependencies**:
         *   `embedding="sentence-transformers"` requires `pip install adaptivegraph[embed]`
         *   `memory="faiss"` requires `pip install adaptivegraph[faiss]`

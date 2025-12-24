@@ -5,7 +5,14 @@ All notable changes to AdaptiveGraph will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] - 2024-12-24
+## [0.1.2] - 2025-12-24
+
+### Fixed
+- Allow `embedding=None` in `LearnableEdge.create()` to enable usage without optional `sentence-transformers` dependency
+- Fixed CI linting issues (formatting)
+- Documentation typo fixes
+
+## [0.1.1] - 2025-12-24
 
 ### Fixed
 - Improved factory method `LearnableEdge.create` with clear error messages for missing optional dependencies (`sentence-transformers`, `faiss-cpu`)

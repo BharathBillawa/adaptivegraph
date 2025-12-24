@@ -15,7 +15,7 @@ class LearnableEdge:
     def create(
         cls,
         options: List[str],
-        embedding: str = "sentence-transformers",
+        embedding: Optional[str] = "sentence-transformers",
         memory: str = "faiss",
         memory_persist_path: Optional[str] = None,
         feature_dim: int = 32,
@@ -43,21 +43,18 @@ class LearnableEdge:
             except ImportError as e:
                 raise ImportError(
                     "The 'sentence-transformers' package is required for default embedding. "
-                    "Install with: pip install adaptivegraph[embed] or pip install sentence-transformers"
+                    "Install with: pip install adaptivegraph[embed] or pip install sentence-transformers\n"
+                    "Alternatively, set embedding=None to use basic hashing instead of semantic embeddings."
                 ) from e
+        elif embedding is None or embedding == "hashing":
+            # Use default hashing behavior (no embedding_fn needed for StateEncoder)
+            embedding_fn = None
         else:
             # Check for legacy parameter use or custom strings
             if embedding != "sentence-transformers":
-                # If users passed 'semantic' via kwargs or similar (though 'create' has clear signature)
-                # Just allow explicitly passed embedding_fn via kwargs if they used constructor directly,
-                # but here we are in factory. factory only supports specific string presets.
-                pass
-            
-            # If it fell through here and wasn't sentence-transformers, we error
-            if embedding != "sentence-transformers": 
-                 raise ValueError(
+                raise ValueError(
                     f"Unknown embedding option: '{embedding}'. "
-                    "Supported: ['sentence-transformers']. "
+                    "Supported: ['sentence-transformers', 'hashing', None]. "
                     "For custom embeddings, use the LearnableEdge constructor directly."
                 )
 
@@ -78,7 +75,9 @@ class LearnableEdge:
         elif memory == "memory":
             experience_store = InMemoryExperienceStore()
         else:
-            raise ValueError(f"Unknown memory option: '{memory}'. Valid: ['faiss', 'memory']")
+            raise ValueError(
+                f"Unknown memory option: '{memory}'. Valid: ['faiss', 'memory']"
+            )
 
         return cls(
             options=options,
