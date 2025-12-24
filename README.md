@@ -94,12 +94,54 @@ The algorithm balances:
 
 ## Features
 
-- **Semantic Routing**: Use sentence transformers for similarity-based decisions
-- **Async Feedback**: Provide feedback hours later using event IDs
-- **Trajectory Rewards**: Reward entire multi-step sessions with decay
-- **Policy Persistence**: Save and restore learned routing policies
+    - **Semantic Routing**: Use sentence transformers for similarity-based decisions (requires `adaptivegraph[embed]`)
+    - **Async Feedback**: Provide feedback hours later using event IDs
+    - **Trajectory Rewards**: Reward entire multi-step sessions with decay
+    - **Policy Persistence**: Save and restore learned routing policies
 
-See [`examples/`](examples/) and [`notebooks/`](notebooks/) for detailed usage.
+    ## Usage Examples
+
+    ### Async Feedback
+    Pass `event_id` in the state to track decisions, then use it to record feedback later.
+    ```python
+    # 1. Make decision with event_id
+    state = {"user": "premium", "query": "async test", "event_id": "req_123"}
+    route = edge(state)
+
+    # 2. Record feedback later using the same ID (no state needed)
+    edge.record_feedback(result={}, reward=1.0, event_id="req_123")
+    ```
+
+    ### Trajectory (Multi-step) Rewards
+    Pass `trace_id` in the state to group decisions into a session.
+    ```python
+    # Step 1
+    edge({"step": 1, "intent": "greeting", "trace_id": "session_abc"})
+    # Step 2
+    edge({"step": 2, "intent": "params", "trace_id": "session_abc"})
+
+    # Reward the whole trace
+    edge.complete_trace(trace_id="session_abc", final_reward=1.0)
+    ```
+
+    ### Statistics
+    Inspect memory to see what the model has learned.
+    ```python
+    stats = edge.memory.get_statistics()
+    print(f"Total decisions: {stats['total_decisions']}")
+    print(f"Average reward: {stats['average_reward']:.2f}")
+
+    # Access raw history
+    print(f"History size: {len(edge.memory.state_history)}")
+    ```
+
+    ## Notes & Gotchas
+    *   **Numpy Arrays**: Must match `feature_dim` (default 32). E.g., `np.random.randn(32)`.
+    *   **Optional Dependencies**:
+        *   `embedding="sentence-transformers"` requires `pip install adaptivegraph[embed]`
+        *   `memory="faiss"` requires `pip install adaptivegraph[faiss]`
+
+    See [`examples/`](examples/) and [`notebooks/`](notebooks/) for detailed usage.
 
 ## Comparison
 

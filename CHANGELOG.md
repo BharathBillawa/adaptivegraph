@@ -5,7 +5,15 @@ All notable changes to AdaptiveGraph will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2024-12-24
+
+### Fixed
+- Improved factory method `LearnableEdge.create` with clear error messages for missing optional dependencies (`sentence-transformers`, `faiss-cpu`)
+- Implemented missing statistics methods `get_statistics`, `total_decisions`, and `state_history` in `InMemoryExperienceStore` and `FaissExperienceStore`
+
+### Documentation
+- Corrected Async/Trajectory usage examples to show `event_id`/`trace_id` inside the state dictionary
+- Added Statistics API examples
 
 ### Added
 - Policy state persistence with `save_policy()` and `load_policy()` methods
@@ -17,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Detailed docstrings for all public APIs
 - Reward validation (checks for NaN/inf values)
 
-### Fixed
+### Fixed (Internal)
 - Removed duplicate `@classmethod` decorator in LearnableEdge
 - Fixed indentation issues in factory method
 - Improved error messages with suggested valid options

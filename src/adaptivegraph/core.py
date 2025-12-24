@@ -33,26 +33,52 @@ class LearnableEdge:
             **kwargs: Additional args passed to LearnableEdge constructor.
         """
         # 1. Setup Embedding
+        # 1. Setup Embedding
         embedding_fn = None
         if embedding == "sentence-transformers":
-            from .embedding import SentenceTransformerEmbedding
+            try:
+                from .embedding import SentenceTransformerEmbedding
 
-            embedding_fn = SentenceTransformerEmbedding(dim=feature_dim)
+                embedding_fn = SentenceTransformerEmbedding(dim=feature_dim)
+            except ImportError as e:
+                raise ImportError(
+                    "The 'sentence-transformers' package is required for default embedding. "
+                    "Install with: pip install adaptivegraph[embed] or pip install sentence-transformers"
+                ) from e
         else:
-            raise ValueError(f"Unknown embedding option: {embedding}")
+            # Check for legacy parameter use or custom strings
+            if embedding != "sentence-transformers":
+                # If users passed 'semantic' via kwargs or similar (though 'create' has clear signature)
+                # Just allow explicitly passed embedding_fn via kwargs if they used constructor directly,
+                # but here we are in factory. factory only supports specific string presets.
+                pass
+            
+            # If it fell through here and wasn't sentence-transformers, we error
+            if embedding != "sentence-transformers": 
+                 raise ValueError(
+                    f"Unknown embedding option: '{embedding}'. "
+                    "Supported: ['sentence-transformers']. "
+                    "For custom embeddings, use the LearnableEdge constructor directly."
+                )
 
         # 2. Setup Memory
         experience_store = None
         if memory == "faiss":
-            from .memory import FaissExperienceStore
+            try:
+                from .memory import FaissExperienceStore
 
-            experience_store = FaissExperienceStore(
-                dim=feature_dim, persist_path=memory_persist_path
-            )
+                experience_store = FaissExperienceStore(
+                    dim=feature_dim, persist_path=memory_persist_path
+                )
+            except ImportError as e:
+                raise ImportError(
+                    "The 'faiss-cpu' package is required for Faiss memory. "
+                    "Install with: pip install adaptivegraph[faiss] or pip install faiss-cpu"
+                ) from e
         elif memory == "memory":
             experience_store = InMemoryExperienceStore()
         else:
-            raise ValueError(f"Unknown memory option: {memory}")
+            raise ValueError(f"Unknown memory option: '{memory}'. Valid: ['faiss', 'memory']")
 
         return cls(
             options=options,

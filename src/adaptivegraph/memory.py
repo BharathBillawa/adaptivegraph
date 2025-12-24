@@ -17,6 +17,14 @@ class ExperienceStore(Protocol):
 
     def get_all(self) -> Dict[str, Any]: ...
 
+    def get_statistics(self) -> Dict[str, Any]: ...
+
+    @property
+    def total_decisions(self) -> int: ...
+
+    @property
+    def state_history(self) -> List[np.ndarray]: ...
+
 
 class InMemoryExperienceStore:
     def __init__(self):
@@ -52,6 +60,21 @@ class InMemoryExperienceStore:
             "rewards": np.array(self.rewards),
             "metadata": self.metadata,
         }
+
+    def get_statistics(self) -> Dict[str, Any]:
+        return {
+            "total_decisions": self.total_decisions,
+            "average_reward": np.mean(self.rewards) if self.rewards else 0.0,
+            "n_actions": len(set(self.actions)),
+        }
+
+    @property
+    def total_decisions(self) -> int:
+        return len(self.actions)
+
+    @property
+    def state_history(self) -> List[np.ndarray]:
+        return self.contexts
 
     def clear(self):
         self.contexts = []
@@ -178,6 +201,21 @@ class FaissExperienceStore:
             "rewards": np.array(self.rewards),
             "metadata": self.metadata,
         }
+
+    def get_statistics(self) -> Dict[str, Any]:
+        return {
+            "total_decisions": self.total_decisions,
+            "average_reward": np.mean(self.rewards) if self.rewards else 0.0,
+            "n_actions": len(set(self.actions)),
+        }
+
+    @property
+    def total_decisions(self) -> int:
+        return len(self.actions)
+
+    @property
+    def state_history(self) -> List[np.ndarray]:
+        return self.contexts
 
     def query_similar(self, context: np.ndarray, k: int = 5) -> Dict[str, Any]:
         vec = context.astype(np.float32)
